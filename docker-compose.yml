@@ -1,0 +1,82 @@
+version: '3.8'
+
+# Docker Compose for DIY Charger Simple Development
+# Provides containerized build environment and log analysis tools
+
+services:
+  # PlatformIO build environment
+  platformio:
+    image: infinitecoding/platformio-for-ci:latest
+    container_name: diy-charger-build
+    volumes:
+      - .:/workspace
+      - platformio-cache:/root/.platformio
+    working_dir: /workspace
+    command: pio run
+    profiles:
+      - build
+    
+  # Development environment with monitoring
+  dev:
+    image: infinitecoding/platformio-for-ci:latest
+    container_name: diy-charger-dev
+    volumes:
+      - .:/workspace
+      - platformio-cache:/root/.platformio
+      - /dev:/dev  # For USB device access
+    working_dir: /workspace
+    privileged: true  # Required for USB access
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0  # Adjust for your ESP32 port
+    command: tail -f /dev/null
+    profiles:
+      - dev
+      
+  # Log analysis service
+  log-analyzer:
+    image: python:3.11-slim
+    container_name: diy-charger-analyzer
+    volumes:
+      - ./tools:/tools
+      - ./logs:/logs
+      - ./reports:/reports
+    working_dir: /tools
+    command: >
+      bash -c "
+        pip install matplotlib numpy pandas &&
+        python parse_logs.py /logs/*.csv --export --save-plot /reports/battery_analysis.png
+      "
+    profiles:
+      - analysis
+
+  # Web dashboard for monitoring (optional)
+  web-dashboard:
+    image: nginx:alpine
+    container_name: diy-charger-dashboard
+    ports:
+      - "8080:80"
+    volumes:
+      - ./reports:/usr/share/nginx/html/reports:ro
+      - ./docs:/usr/share/nginx/html/docs:ro
+    profiles:
+      - dashboard
+
+volumes:
+  platformio-cache:
+    driver: local
+
+# Usage:
+# Build firmware:
+#   docker-compose --profile build up
+#
+# Development mode:
+#   docker-compose --profile dev up -d
+#   docker exec -it diy-charger-dev bash
+#   pio run --target upload
+#
+# Analyze logs:
+#   docker-compose --profile analysis up
+#
+# View reports:
+#   docker-compose --profile dashboard up -d
+#   open http://localhost:8080
