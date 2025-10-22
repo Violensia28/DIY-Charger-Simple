@@ -1,0 +1,69 @@
+{
+    "editor.formatOnSave": true,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "files.associations": {
+        "*.h": "cpp",
+        "*.cpp": "cpp",
+        "*.ino": "cpp"
+    },
+    "files.exclude": {
+        "**/.pio": true,
+        "**/.vscode/.browse.c_cpp.db*": true,
+        "**/node_modules": true
+    },
+    "C_Cpp.default.configurationProvider": "platformio.platformio-ide",
+    "terminal.integrated.env.linux": {
+        "PATH": "${env:PATH}:${env:HOME}/.platformio/penv/bin"
+    },
+    "terminal.integrated.env.osx": {
+        "PATH": "${env:PATH}:${env:HOME}/.platformio/penv/bin"
+    },
+    "terminal.integrated.env.windows": {
+        "PATH": "${env:PATH};${env:USERPROFILE}\\.platformio\\penv\\Scripts"
+    },
+    "cmake.configureOnOpen": false,
+    "C_Cpp.intelliSenseEngine": "Tag Parser",
+    "editor.rulers": [
+        80,
+        120
+    ],
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "[markdown]": {
+        "editor.wordWrap": "on",
+        "editor.quickSuggestions": false
+    },
+    "todo-tree.general.tags": [
+        "BUG",
+        "HACK",
+        "FIXME",
+        "TODO",
+        "XXX",
+        "[ ]",
+        "[x]"
+    ],
+    "todo-tree.regex.regex": "(//|#|<!--|;|/\\*|^|^\\s*(-|\\*))\\s*($TAGS)",
+    "cSpell.words": [
+        "platformio",
+        "pio",
+        "ESP32",
+        "INA226",
+        "TP4056",
+        "IRLR",
+        "SSD1306",
+        "OLED",
+        "MOSFET",
+        "LiFePO4",
+        "LiPo",
+        "mAh",
+        "Wh"
+    ]
+}
