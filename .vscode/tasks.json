@@ -1,0 +1,88 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "pio run",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Upload",
+            "type": "shell",
+            "command": "pio run --target upload",
+            "group": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Upload and Monitor",
+            "type": "shell",
+            "command": "pio run --target upload && pio device monitor",
+            "group": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "pio run --target clean",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Monitor",
+            "type": "shell",
+            "command": "pio device monitor",
+            "problemMatcher": [],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "I2C Scanner",
+            "type": "shell",
+            "command": "bash test/test_hardware.sh",
+            "group": "test",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Deploy",
+            "type": "shell",
+            "command": "bash deploy.sh",
+            "group": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Parse Logs",
+            "type": "shell",
+            "command": "python3 tools/parse_logs.py logs/*.csv --plot",
+            "group": "test",
+            "problemMatcher": []
+        }
+    ]
+}
