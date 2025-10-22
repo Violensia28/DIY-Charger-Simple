@@ -1,0 +1,371 @@
+name: Build and Test ESP32 Firmware
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'tools/**'
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ created, published ]
+  workflow_dispatch:  # Manual trigger
+
+env:
+  PLATFORMIO_VERSION: latest
+  BUILD_FLAGS: -DCORE_DEBUG_LEVEL=0
+
+jobs:
+  # Job 1: Build firmware
+  build:
+    name: Build Firmware
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for version tagging
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: 📦 Cache PlatformIO
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.platformio
+          .pio
+        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-pio-
+    
+    - name: 🔧 Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+        pio --version
+        
+    - name: 🔨 Build firmware
+      run: |
+        echo "Building DIY Charger Simple firmware..."
+        pio run
+        
+    - name: 📊 Check firmware size
+      run: |
+        echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        pio run --target size | tee size_output.txt
+        cat size_output.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📋 Generate build info
+      run: |
+        cat > .pio/build/esp32dev/build_info.txt << EOF
+        Build Information
+        =================
+        Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        Commit: ${{ github.sha }}
+        Branch: ${{ github.ref_name }}
+        Actor: ${{ github.actor }}
+        Workflow: ${{ github.workflow }}
+        Run: ${{ github.run_number }}
+        EOF
+        
+    - name: 📤 Upload firmware artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: firmware-${{ github.sha }}
+        path: |
+          .pio/build/esp32dev/firmware.bin
+          .pio/build/esp32dev/firmware.elf
+          .pio/build/esp32dev/build_info.txt
+        retention-days: 30
+        if-no-files-found: error
+
+  # Job 2: Static analysis
+  lint:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: 🔧 Install PlatformIO
+      run: |
+        pip install platformio
+        
+    - name: 🔍 Run static analysis
+      run: |
+        echo "### Static Analysis Results" >> $GITHUB_STEP_SUMMARY
+        pio check --skip-packages --fail-on-defect=high --severity=high || echo "⚠️ High severity issues found" >> $GITHUB_STEP_SUMMARY
+      continue-on-error: true
+      
+    - name: 📝 Check code formatting
+      run: |
+        # Check for common formatting issues
+        echo "Checking code formatting..."
+        if grep -r \t' src/ include/; then
+          echo "❌ Tabs found in source files (use spaces)" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        else
+          echo "✅ No tabs found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  # Job 3: Test Python tools
+  test-tools:
+    name: Test Analysis Tools
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: 📦 Install dependencies
+      run: |
+        pip install matplotlib numpy pandas
+        
+    - name: 🧪 Test log parser
+      run: |
+        # Create sample CSV for testing
+        cat > test_log.csv << EOF
+        Timestamp,Port,Voltage(V),Current(A),Power(W),mAh,Wh,Mode,Battery,Status
+        0,0,4.20,0.00,0.00,0.0,0.00,Safety,Li-ion,Idle
+        1,0,4.15,0.98,4.07,0.3,0.00,Discharging,Li-ion,Active
+        2,0,4.10,0.96,3.94,0.6,0.00,Discharging,Li-ion,Active
+        EOF
+        
+        python3 tools/parse_logs.py test_log.csv --export
+        
+        if [ -f test_log_summary.txt ]; then
+          echo "✅ Log parser working correctly" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Log parser failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+  # Job 4: Security scan
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔒 Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+      continue-on-error: true
+      
+    - name: 📤 Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+      if: always()
+
+  # Job 5: Create release (only on tags)
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build, lint, test-tools]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📥 Download firmware artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware-${{ github.sha }}
+        path: ./artifacts
+        
+    - name: 📦 Create release package
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        RELEASE_NAME="diy-charger-simple_v${VERSION}_$(date +%Y%m%d)"
+        
+        mkdir -p release/$RELEASE_NAME
+        
+        # Copy firmware
+        cp artifacts/firmware.bin release/$RELEASE_NAME/
+        cp artifacts/firmware.elf release/$RELEASE_NAME/
+        
+        # Copy documentation
+        cp README.md release/$RELEASE_NAME/
+        cp QUICKSTART.md release/$RELEASE_NAME/
+        cp WIRING.md release/$RELEASE_NAME/
+        cp LICENSE release/$RELEASE_NAME/
+        
+        # Create flash instructions
+        cat > release/$RELEASE_NAME/FLASH.txt << EOF
+        DIY Charger Simple v${VERSION}
+        ==============================
+        
+        Quick Flash:
+        esptool.py --port /dev/ttyUSB0 write_flash 0x10000 firmware.bin
+        
+        See README.md for detailed instructions.
+        EOF
+        
+        # Create archive
+        cd release
+        tar -czf ${RELEASE_NAME}.tar.gz ${RELEASE_NAME}
+        zip -r ${RELEASE_NAME}.zip ${RELEASE_NAME}
+        cd ..
+        
+        echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
+        
+    - name: 📝 Generate changelog
+      id: changelog
+      run: |
+        # Get commits since last tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -z "$PREV_TAG" ]; then
+          COMMITS=$(git log --pretty=format:"- %s" HEAD)
+        else
+          COMMITS=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
+        fi
+        
+        cat > CHANGELOG.md << EOF
+        ## What's Changed
+        
+        ${COMMITS}
+        
+        **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ github.ref_name }}
+        EOF
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat CHANGELOG.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: 🚀 Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/${{ env.RELEASE_NAME }}.tar.gz
+          release/${{ env.RELEASE_NAME }}.zip
+          artifacts/firmware.bin
+          artifacts/firmware.elf
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 6: Notify on failure
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [build, lint, test-tools]
+    if: failure()
+    
+    steps:
+    - name: 📧 Send notification
+      run: |
+        echo "❌ Build failed for commit ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+
+  # Job 7: Documentation check
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📚 Check documentation files
+      run: |
+        echo "### Documentation Status" >> $GITHUB_STEP_SUMMARY
+        
+        REQUIRED_DOCS=("README.md" "QUICKSTART.md" "WIRING.md" "LICENSE" "CONTRIBUTING.md")
+        
+        for doc in "${REQUIRED_DOCS[@]}"; do
+          if [ -f "$doc" ]; then
+            echo "✅ $doc exists" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ $doc missing" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+        done
+        
+    - name: 🔗 Check for broken links
+      run: |
+        # Simple check for markdown links
+        echo "Checking for broken internal links..."
+        
+        for file in *.md docs/*.md 2>/dev/null; do
+          if [ -f "$file" ]; then
+            echo "Checking $file..."
+            grep -o '\[.*\](.*.md)' "$file" | grep -o '(.*.md)' | tr -d '()' | while read link; do
+              if [ ! -f "$link" ]; then
+                echo "⚠️ Broken link in $file: $link"
+              fi
+            done
+          fi
+        done
+
+  # Job 8: Dependency check
+  dependencies:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: 🔧 Install PlatformIO
+      run: pip install platformio
+      
+    - name: 📦 Check library versions
+      run: |
+        echo "### Library Versions" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        pio pkg list
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        
+    - name: 🔄 Check for updates
+      run: |
+        echo "Checking for library updates..."
+        pio pkg outdated || true
+
+# Workflow summary
+# This workflow:
+# 1. ✅ Builds firmware for ESP32
+# 2. 🔍 Runs static analysis and linting
+# 3. 🧪 Tests Python analysis tools
+# 4. 🔒 Performs security scanning
+# 5. 📚 Validates documentation
+# 6. 📦 Checks dependencies
+# 7. 🚀 Creates releases on tags
+# 8. 📧 Notifies on failures
