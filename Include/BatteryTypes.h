@@ -81,8 +81,7 @@ struct PortData {
         errorCount(0) {
         errorMsg[0] = '\0';
     }
-    
-    // Get effective cutoff voltage
+// Get effective cutoff voltage
     float getCutoffVoltage() const {
         if (useCustomCutoff) {
             return customCutoff;
@@ -116,10 +115,11 @@ struct PortData {
         }
     }
     
-    // Check if discharge should stop
+    // ✅ FIX: Added hysteresis to prevent oscillation
     bool shouldStopDischarge() const {
         if (mode != DISCHARGING) return false;
-        return voltage <= getCutoffVoltage();
+        // Add 50mV hysteresis to prevent MOSFET switching oscillation
+        return voltage <= (getCutoffVoltage() + 0.05);
     }
     
     // Reset accumulated data
@@ -127,6 +127,7 @@ struct PortData {
         mAh = 0;
         Wh = 0;
         startTime = millis();
+        lastUpdate = 0; // ✅ FIX: Reset lastUpdate to prevent deltaTime issues
         errorCount = 0;
         errorMsg[0] = '\0';
         status = IDLE;
