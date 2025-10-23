@@ -336,9 +336,12 @@ void WebUI::handleGetLogs(AsyncWebServerRequest *request) {
             csv += String(portData[i].power, 2) + ",";
             csv += String(portData[i].mAh, 1) + ",";
             csv += String(portData[i].Wh, 2) + ",";
-            csv += portData[i].getModeName() + ",";
-            csv += portData[i].getBatteryName() + ",";
-            csv += portData[i].getStatusName() + "\n";
+            csv += portData[i].getModeName();
+csv += ",";
+csv += portData[i].getBatteryName();
+csv += ",";
+csv += portData[i].getStatusName();
+csv += "\n";
         }
     }
     
