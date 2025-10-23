@@ -48,13 +48,13 @@ bool BatteryLogger::initPort(int port) {
         return false;
     }
     
-    // Initialize INA226_WE
+    // Initialize INA226_WE with address
+    ina226[port] = INA226_WE(INA226_ADDR[port]);
     ina226[port].init();
-    ina226[port].setI2CAddress(INA226_ADDR[port]);
     
-    // Configure INA226_WE - FIX: Use correct enum values
-    ina226[port].setAverage(AVERAGE_1024);  // Use AVERAGE_1024 instead of AVERAGE_16
-    ina226[port].setConversionTime(CONV_TIME_1100, CONV_TIME_1100);  // shunt, bus
+    // Configure INA226_WE - Use proper enum names with INA226_ prefix
+    ina226[port].setAverage(INA226_AVERAGE_1024);
+    ina226[port].setConversionTime(INA226_CONV_TIME_1100, INA226_CONV_TIME_1100);
     
     // Set resistor and current range (0.1 ohm, 3.2A max)
     ina226[port].setResistorRange(SHUNT_RESISTOR, MAX_CURRENT);
