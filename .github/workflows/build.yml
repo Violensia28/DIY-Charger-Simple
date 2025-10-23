@@ -39,14 +39,14 @@ jobs:
         python-version: '3.11'
 
     - name: 📦 Cache PlatformIO
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.platformio
-          .pio
-        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3
-        restore-keys: |
-          ${{ runner.os }}-pio-
+  uses: actions/cache@v3
+  with:
+    path: |
+      ~/.platformio
+      .pio
+    key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3
+    restore-keys: |
+      ${{ runner.os }}-pio-
 
     - name: 🔧 Install PlatformIO
       run: |
@@ -77,9 +77,12 @@ jobs:
         git ls-files | grep -iE '(Logger|WebUI|UI)\.h' || echo "Headers not found by git ls-files"
 
     - name: 🔨 Build firmware
-      run: |
-        echo "Building DIY Charger Simple firmware..."
-        pio run -v # Tetap pakai verbose di build utama
+  run: |
+    echo "Building DIY Charger Simple firmware..."
+    if ! pio run -v; then
+      echo "::error::Build failed. Check the logs above for details."
+      exit 1
+    fi
 
     - name: 📊 Check firmware size
       run: |
