@@ -44,8 +44,7 @@ jobs:
         path: |
           ~/.platformio
           .pio
-        # Key cache sedikit diubah lagi untuk memastikan refresh
-        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3
+        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3 # Key tetap v3
         restore-keys: |
           ${{ runner.os }}-pio-
 
@@ -55,17 +54,20 @@ jobs:
         pip install platformio
         pio --version
 
-    - name: ✨ Update PIO Registry
-      run: pio pkg update # Tetap jalankan update registry
+    # <-- PERUBAHAN DI SINI: Bersihkan cache PIO
+    - name: 🧹 Prune PIO Cache
+      run: pio system prune -f
 
-    # <-- PERUBAHAN DI SINI: Flag -v dihapus dari pio pkg install
+    - name: ✨ Update PIO Registry
+      run: pio pkg update
+
     - name: 📦 Install PIO Project Dependencies
-      run: pio pkg install
+      run: pio pkg install # Tanpa -v
 
     - name: 🔨 Build firmware
       run: |
         echo "Building DIY Charger Simple firmware..."
-        pio run -v # Tetap pakai -v di sini untuk detail build
+        pio run -v
 
     - name: 📊 Check firmware size
       run: |
@@ -118,12 +120,15 @@ jobs:
       run: |
         pip install platformio
 
+    # <-- PERUBAHAN DI SINI: Bersihkan cache PIO
+    - name: 🧹 Prune PIO Cache
+      run: pio system prune -f
+
     - name: ✨ Update PIO Registry
       run: pio pkg update
 
-    # <-- PERUBAHAN DI SINI: Flag -v dihapus dari pio pkg install
     - name: 📦 Install PIO Dependencies
-      run: pio pkg install
+      run: pio pkg install # Tanpa -v
 
     - name: ✨ Initialize PIO Environment
       run: pio run -t nobuild -v
@@ -317,6 +322,7 @@ jobs:
         done
         echo "Link check complete."
 
+
   # Job 8: Dependency check
   dependencies:
     name: Check Dependencies
@@ -334,10 +340,13 @@ jobs:
     - name: 🔧 Install PlatformIO
       run: pip install platformio
 
+    # <-- PERUBAHAN DI SINI: Bersihkan cache PIO
+    - name: 🧹 Prune PIO Cache
+      run: pio system prune -f
+
     - name: ✨ Update PIO Registry
       run: pio pkg update
 
-    # <-- PERUBAHAN DI SINI: Flag -v dihapus dari pio pkg install
     - name: 📦 Check library versions
       run: |
         echo "### Library Versions" >> $GITHUB_STEP_SUMMARY
