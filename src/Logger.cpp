@@ -116,8 +116,22 @@ void BatteryLogger::updatePort(int port) {
     portData[port].current = filteredCurrent;
     portData[port].power = filteredVoltage * filteredCurrent;
     
+    // ✅ FIX: Initialize lastUpdate on first run
+    if (portData[port].lastUpdate == 0) {
+        portData[port].lastUpdate = millis();
+        return; // Skip accumulator update on first sample
+    }
+    
     // Update accumulators (mAh and Wh)
     unsigned long deltaTime = millis() - portData[port].lastUpdate;
+    
+    // ✅ FIX: Sanity check for deltaTime (max 10 seconds)
+    if (deltaTime > 10000) {
+        DEBUG_PRINTF("Port %d: Warning - deltaTime too large (%lu ms), resetting\n", port, deltaTime);
+        portData[port].lastUpdate = millis();
+        return;
+    }
+    
     updateAccumulators(port, filteredVoltage, filteredCurrent, deltaTime);
     
     portData[port].lastUpdate = millis();
@@ -136,17 +150,22 @@ void BatteryLogger::updatePort(int port) {
 // ============================================
 
 float BatteryLogger::medianFilter(float* buffer, int size) {
+    // ✅ FIX: Use selection sort (faster for small arrays)
     float sorted[FILTER_SAMPLES];
     memcpy(sorted, buffer, size * sizeof(float));
     
-    // Simple bubble sort
+    // Selection sort (O(n²) but fast for small n)
     for (int i = 0; i < size - 1; i++) {
-        for (int j = 0; j < size - i - 1; j++) {
-            if (sorted[j] > sorted[j + 1]) {
-                float temp = sorted[j];
-                sorted[j] = sorted[j + 1];
-                sorted[j + 1] = temp;
+        int minIdx = i;
+        for (int j = i + 1; j < size; j++) {
+            if (sorted[j] < sorted[minIdx]) {
+                minIdx = j;
             }
+        }
+        if (minIdx != i) {
+            float temp = sorted[i];
+            sorted[i] = sorted[minIdx];
+            sorted[minIdx] = temp;
         }
     }
     
@@ -160,21 +179,39 @@ void BatteryLogger::updateAccumulators(int port, float voltage, float current, u
     // Convert deltaTime to hours
     float deltaHours = deltaTime / 3600000.0;
     
+    // ✅ FIX: Sanity check - ignore unrealistic values
+    if (deltaHours > 0.1) { // More than 6 minutes = error
+        DEBUG_PRINTF("Port %d: deltaHours too large (%.4f), skipping accumulation\n", port, deltaHours);
+        return;
+    }
+    
     // Update mAh (current in A, so multiply by 1000)
     portData[port].mAh += (current * 1000.0) * deltaHours;
     
     // Update Wh
     portData[port].Wh += (voltage * current) * deltaHours;
+    
+    // ✅ FIX: Prevent negative accumulation
+    if (portData[port].mAh < 0) portData[port].mAh = 0;
+    if (portData[port].Wh < 0) portData[port].Wh = 0;
 }
 
 bool BatteryLogger::validateReading(int port, float voltage, float current) {
     // Check for reasonable voltage range
     if (voltage < MIN_VOLTAGE || voltage > MAX_VOLTAGE) {
+        DEBUG_PRINTF("Port %d: Invalid voltage %.3fV\n", port, voltage);
         return false;
     }
     
     // Check for reasonable current range (can be negative for charging)
     if (abs(current) > MAX_DISCHARGE_CURRENT) {
+        DEBUG_PRINTF("Port %d: Invalid current %.3fA\n", port, current);
+        return false;
+    }
+    
+    // ✅ FIX: Check for NaN or Inf
+    if (isnan(voltage) || isinf(voltage) || isnan(current) || isinf(current)) {
+        DEBUG_PRINTF("Port %d: NaN/Inf detected\n", port);
         return false;
     }
     
