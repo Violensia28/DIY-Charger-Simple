@@ -22,19 +22,22 @@ env:
   BUILD_FLAGS: -DCORE_DEBUG_LEVEL=0
 
 jobs:
-  # Job 1: Build firmware (Tidak ada perubahan di job ini selain dari file platformio.ini)
+  # Job 1: Build firmware
   build:
     name: Build Firmware
     runs-on: ubuntu-latest
+
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
     - name: 🐍 Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+
     - name: 📦 Cache PlatformIO
       uses: actions/cache@v3
       with:
@@ -44,19 +47,24 @@ jobs:
         key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3
         restore-keys: |
           ${{ runner.os }}-pio-
+
     - name: 🔧 Install PlatformIO
       run: |
         python -m pip install --upgrade pip
         pip install platformio
         pio --version
+
     - name: 🧹 Prune PIO Cache
       run: pio system prune -f
+
     - name: ✨ Update PIO Registry
       run: pio pkg update
-    - name: 📦 Install PIO Project Dependencies
-      run: pio pkg install
 
-      name: 🌲 Show source tree
+    - name: 📦 Install PIO Project Dependencies
+      run: pio pkg install # Tanpa -v
+
+    # <-- Langkah Diagnostik Ditambahkan Di Sini
+    - name: 🌲 Show source tree
       run: |
         echo "Current Directory: $(pwd)"
         echo "Listing root:"
@@ -67,10 +75,12 @@ jobs:
         ls -la include || echo "include/ not found"
         echo "Checking specific headers via git:"
         git ls-files | grep -iE '(Logger|WebUI|UI)\.h' || echo "Headers not found by git ls-files"
+
     - name: 🔨 Build firmware
       run: |
         echo "Building DIY Charger Simple firmware..."
         pio run -v # Tetap pakai verbose di build utama
+
     - name: 📊 Check firmware size
       run: |
         echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
@@ -78,6 +88,7 @@ jobs:
         pio run --target size | tee size_output.txt
         cat size_output.txt >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
+
     - name: 📋 Generate build info
       run: |
         mkdir -p .pio/build/esp32dev
@@ -91,6 +102,7 @@ jobs:
         Workflow: ${{ github.workflow }}
         Run: ${{ github.run_number }}
         EOF
+
     - name: 📤 Upload firmware artifact
       uses: actions/upload-artifact@v4
       with:
@@ -129,14 +141,11 @@ jobs:
     - name: 📦 Install PIO Dependencies
       run: pio pkg install # Tanpa -v
 
-    # <-- PERUBAHAN DI SINI: Hapus langkah Initialize PIO Environment
-    # - name: ✨ Initialize PIO Environment
-    #   run: pio run -t nobuild -v
+    # Langkah nobuild dihapus dari sini
 
     - name: 🔍 Run static analysis
       run: |
         echo "### Static Analysis Results" >> $GITHUB_STEP_SUMMARY
-        # Menjalankan pio check langsung setelah install dependencies
         pio check --fail-on-defect=high --severity=high -v || echo "⚠️ High severity issues found" >> $GITHUB_STEP_SUMMARY
       continue-on-error: true
 
@@ -150,7 +159,6 @@ jobs:
           echo "✅ No tabs found" >> $GITHUB_STEP_SUMMARY
         fi
 
-  # ... (Job 3 sampai 8 tetap sama seperti sebelumnya) ...
   # Job 3: Test Python tools
   test-tools:
     name: Test Analysis Tools
