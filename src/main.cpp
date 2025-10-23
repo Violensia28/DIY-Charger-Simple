@@ -33,8 +33,8 @@ void updateMOSFETs() {
         
         // MOSFET ON only during discharge mode
         if (portData[i].mode == DISCHARGING && portData[i].active) {
-            // ✅ FIX: Use the new method with hysteresis
-            if (!portData[i].shouldStopDischarge()) {
+            // Check if voltage is above cutoff
+            if (portData[i].voltage > portData[i].getCutoffVoltage()) {
                 shouldBeOn = true;
                 portData[i].status = ACTIVE;
             } else {
@@ -54,9 +54,9 @@ void updateMOSFETs() {
         if (portData[i].mode == CHARGING && portData[i].active) {
             shouldBeOn = false;
             
-            // ✅ FIX: More realistic charging detection (10% tolerance and lower current threshold)
+            // Check if charging is complete (voltage near max)
             float maxV = BATTERY_CONFIGS[portData[i].batteryType].maxVoltage;
-            if (portData[i].voltage >= maxV - 0.1 && abs(portData[i].current) < 0.05) {
+            if (portData[i].voltage >= maxV - 0.05 && abs(portData[i].current) < 0.1) {
                 portData[i].status = COMPLETE;
                 portData[i].active = false;
                 DEBUG_PRINTF("Port %d: Charging complete (%.3fV)\n", i, portData[i].voltage);
@@ -76,40 +76,27 @@ void updateMOSFETs() {
             portData[i].status = IDLE;
         }
         
-        // ✅ FIX: Better safety checks with different error messages
-        // Safety check - critical low voltage
+        // Safety check - critical voltage
         if (portData[i].voltage < MIN_VOLTAGE && portData[i].voltage > 0.1) {
             shouldBeOn = false;
-            if (portData[i].status != ERROR) {
-                portData[i].status = ERROR;
-                portData[i].active = false;
-                snprintf(portData[i].errorMsg, 64, "Voltage critically low: %.2fV", portData[i].voltage);
+            portData[i].status = ERROR;
+            portData[i].active = false;
+            snprintf(portData[i].errorMsg, 64, "Voltage too low");
+            
+            if (previousStatus != ERROR) {
                 physicalUI->notifyError(i);
-                DEBUG_PRINTF("Port %d: ERROR - %s\n", i, portData[i].errorMsg);
             }
         }
         
         // Safety check - overvoltage
         if (portData[i].voltage > MAX_VOLTAGE) {
             shouldBeOn = false;
-            if (portData[i].status != ERROR) {
-                portData[i].status = ERROR;
-                portData[i].active = false;
-                snprintf(portData[i].errorMsg, 64, "Overvoltage: %.2fV", portData[i].voltage);
+            portData[i].status = ERROR;
+            portData[i].active = false;
+            snprintf(portData[i].errorMsg, 64, "Voltage too high");
+            
+            if (previousStatus != ERROR) {
                 physicalUI->notifyError(i);
-                DEBUG_PRINTF("Port %d: ERROR - %s\n", i, portData[i].errorMsg);
-            }
-        }
-        
-        // ✅ FIX: Safety check - overcurrent
-        if (abs(portData[i].current) > MAX_DISCHARGE_CURRENT) {
-            shouldBeOn = false;
-            if (portData[i].status != ERROR) {
-                portData[i].status = ERROR;
-                portData[i].active = false;
-                snprintf(portData[i].errorMsg, 64, "Overcurrent: %.2fA", portData[i].current);
-                physicalUI->notifyError(i);
-                DEBUG_PRINTF("Port %d: ERROR - %s\n", i, portData[i].errorMsg);
             }
         }
         
