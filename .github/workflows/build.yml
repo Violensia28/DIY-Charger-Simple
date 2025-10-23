@@ -22,53 +22,43 @@ env:
   BUILD_FLAGS: -DCORE_DEBUG_LEVEL=0
 
 jobs:
-  # Job 1: Build firmware
+  # Job 1: Build firmware (Tidak ada perubahan di job ini selain dari file platformio.ini)
   build:
     name: Build Firmware
     runs-on: ubuntu-latest
-
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
     - name: 🐍 Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-
     - name: 📦 Cache PlatformIO
       uses: actions/cache@v3
       with:
         path: |
           ~/.platformio
           .pio
-        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3 # Key tetap v3
+        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3
         restore-keys: |
           ${{ runner.os }}-pio-
-
     - name: 🔧 Install PlatformIO
       run: |
         python -m pip install --upgrade pip
         pip install platformio
         pio --version
-
-    # <-- PERUBAHAN DI SINI: Bersihkan cache PIO
     - name: 🧹 Prune PIO Cache
       run: pio system prune -f
-
     - name: ✨ Update PIO Registry
       run: pio pkg update
-
     - name: 📦 Install PIO Project Dependencies
-      run: pio pkg install # Tanpa -v
-
+      run: pio pkg install
     - name: 🔨 Build firmware
       run: |
         echo "Building DIY Charger Simple firmware..."
-        pio run -v
-
+        pio run -v # Tetap pakai verbose di build utama
     - name: 📊 Check firmware size
       run: |
         echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
@@ -76,7 +66,6 @@ jobs:
         pio run --target size | tee size_output.txt
         cat size_output.txt >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
-
     - name: 📋 Generate build info
       run: |
         mkdir -p .pio/build/esp32dev
@@ -90,7 +79,6 @@ jobs:
         Workflow: ${{ github.workflow }}
         Run: ${{ github.run_number }}
         EOF
-
     - name: 📤 Upload firmware artifact
       uses: actions/upload-artifact@v4
       with:
@@ -120,7 +108,6 @@ jobs:
       run: |
         pip install platformio
 
-    # <-- PERUBAHAN DI SINI: Bersihkan cache PIO
     - name: 🧹 Prune PIO Cache
       run: pio system prune -f
 
@@ -130,12 +117,14 @@ jobs:
     - name: 📦 Install PIO Dependencies
       run: pio pkg install # Tanpa -v
 
-    - name: ✨ Initialize PIO Environment
-      run: pio run -t nobuild -v
+    # <-- PERUBAHAN DI SINI: Hapus langkah Initialize PIO Environment
+    # - name: ✨ Initialize PIO Environment
+    #   run: pio run -t nobuild -v
 
     - name: 🔍 Run static analysis
       run: |
         echo "### Static Analysis Results" >> $GITHUB_STEP_SUMMARY
+        # Menjalankan pio check langsung setelah install dependencies
         pio check --fail-on-defect=high --severity=high -v || echo "⚠️ High severity issues found" >> $GITHUB_STEP_SUMMARY
       continue-on-error: true
 
@@ -149,7 +138,8 @@ jobs:
           echo "✅ No tabs found" >> $GITHUB_STEP_SUMMARY
         fi
 
-  # Job 3: Test Python tools (Tetap sama)
+  # ... (Job 3 sampai 8 tetap sama seperti sebelumnya) ...
+  # Job 3: Test Python tools
   test-tools:
     name: Test Analysis Tools
     runs-on: ubuntu-latest
@@ -180,7 +170,7 @@ jobs:
           exit 1
         fi
 
-  # Job 4: Security scan (Tetap sama)
+  # Job 4: Security scan
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -200,7 +190,7 @@ jobs:
         sarif_file: 'trivy-results.sarif'
       if: always()
 
-  # Job 5: Create release (Tetap sama)
+  # Job 5: Create release
   release:
     name: Create Release
     runs-on: ubuntu-latest
@@ -266,7 +256,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Job 6: Notify on failure (Tetap sama)
+  # Job 6: Notify on failure
   notify-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
@@ -280,7 +270,7 @@ jobs:
         echo "Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
         echo "Check the workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
-  # Job 7: Documentation check (Tetap sama)
+  # Job 7: Documentation check
   docs:
     name: Documentation Check
     runs-on: ubuntu-latest
@@ -322,7 +312,6 @@ jobs:
         done
         echo "Link check complete."
 
-
   # Job 8: Dependency check
   dependencies:
     name: Check Dependencies
@@ -340,7 +329,6 @@ jobs:
     - name: 🔧 Install PlatformIO
       run: pip install platformio
 
-    # <-- PERUBAHAN DI SINI: Bersihkan cache PIO
     - name: 🧹 Prune PIO Cache
       run: pio system prune -f
 
@@ -351,11 +339,11 @@ jobs:
       run: |
         echo "### Library Versions" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
-        pio pkg install # Install dulu (tanpa -v)
-        pio pkg list       # Baru list
+        pio pkg install # Tanpa -v
+        pio pkg list
         echo '```' >> $GITHUB_STEP_SUMMARY
 
     - name: 🔄 Check for updates
       run: |
         echo "Checking for library updates..."
-        pio pkg outdated -v || true # Tetap pakai -v di sini
+        pio pkg outdated -v || true
