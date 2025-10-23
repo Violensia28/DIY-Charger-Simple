@@ -72,7 +72,7 @@ bool PhysicalUI::begin() {
 }
 
 // ============================================
-// ISR HANDLERS
+// ISR HANDLERS (✅ FIXED - Minimal processing in ISR)
 // ============================================
 
 void IRAM_ATTR PhysicalUI::handleEncoderA() {
@@ -92,13 +92,10 @@ void IRAM_ATTR PhysicalUI::handleEncoderB() {
     // Handled by handleEncoderA
 }
 
+// ✅ FIX: Simplified ISR - only set flag, no millis() call
 void IRAM_ATTR PhysicalUI::handleButton() {
     if (instance) {
-        unsigned long now = millis();
-        if (now - instance->lastButtonPress > ENCODER_DEBOUNCE) {
-            instance->buttonPressed = true;
-            instance->lastButtonPress = now;
-        }
+        instance->buttonPressed = true;
     }
 }
 
@@ -120,12 +117,19 @@ void PhysicalUI::update() {
         displayNeedsUpdate = true;
     }
     
-    // Check for button press
+    // ✅ FIX: Handle button press with debouncing in main loop
     if (buttonPressed) {
-        buttonPressed = false;
-        handleButtonPress();
-        lastMenuActivity = currentTime;
-        displayNeedsUpdate = true;
+        // Debounce check
+        if (currentTime - lastButtonPress > ENCODER_DEBOUNCE) {
+            buttonPressed = false;
+            handleButtonPress();
+            lastButtonPress = currentTime;
+            lastMenuActivity = currentTime;
+            displayNeedsUpdate = true;
+        } else {
+            // Ignore bounce
+            buttonPressed = false;
+        }
     }
     
     // Menu timeout - return to main
@@ -390,7 +394,7 @@ void PhysicalUI::drawConfirm() {
 }
 
 // ============================================
-// HELPER DRAWING FUNCTIONS
+// HELPER DRAWING FUNCTIONS (✅ FIXED - Added bounds checking)
 // ============================================
 
 void PhysicalUI::drawHeader(const char* title) {
@@ -404,6 +408,10 @@ void PhysicalUI::drawHeader(const char* title) {
 }
 
 void PhysicalUI::drawPortStatus(int port, int y) {
+    // ✅ FIX: Bounds checking
+    if (port < 0 || port >= NUM_PORTS) return;
+    if (y < 0 || y > 58) return;
+    
     display->setTextSize(1);
     display->setCursor(0, y);
     display->print("P");
