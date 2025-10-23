@@ -44,8 +44,8 @@ jobs:
         path: |
           ~/.platformio
           .pio
-        # <-- PERUBAHAN DI SINI: Menambahkan suffix '-v2' ke key untuk memaksa refresh
-        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v2
+        # Key cache sedikit diubah lagi untuk memastikan refresh
+        key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}-v3
         restore-keys: |
           ${{ runner.os }}-pio-
 
@@ -55,19 +55,17 @@ jobs:
         pip install platformio
         pio --version
 
-    # <-- PERUBAHAN DI SINI: Update registry sebelum install
     - name: ✨ Update PIO Registry
-      run: pio pkg update
+      run: pio pkg update # Tetap jalankan update registry
 
-    # <-- PERUBAHAN DI SINI: Tambahkan flag verbose
+    # <-- PERUBAHAN DI SINI: Flag -v dihapus dari pio pkg install
     - name: 📦 Install PIO Project Dependencies
-      run: pio pkg install -v
+      run: pio pkg install
 
-    # <-- PERUBAHAN DI SINI: Tambahkan flag verbose
     - name: 🔨 Build firmware
       run: |
         echo "Building DIY Charger Simple firmware..."
-        pio run -v
+        pio run -v # Tetap pakai -v di sini untuk detail build
 
     - name: 📊 Check firmware size
       run: |
@@ -120,19 +118,16 @@ jobs:
       run: |
         pip install platformio
 
-    # <-- PERUBAHAN DI SINI: Update registry sebelum install
     - name: ✨ Update PIO Registry
       run: pio pkg update
 
-    # <-- PERUBAHAN DI SINI: Tambahkan flag verbose
+    # <-- PERUBAHAN DI SINI: Flag -v dihapus dari pio pkg install
     - name: 📦 Install PIO Dependencies
-      run: pio pkg install -v
+      run: pio pkg install
 
-    # <-- PERUBAHAN DI SINI: Tambahkan flag verbose
     - name: ✨ Initialize PIO Environment
       run: pio run -t nobuild -v
 
-    # <-- PERUBAHAN DI SINI: Tambahkan flag verbose
     - name: 🔍 Run static analysis
       run: |
         echo "### Static Analysis Results" >> $GITHUB_STEP_SUMMARY
@@ -322,7 +317,6 @@ jobs:
         done
         echo "Link check complete."
 
-
   # Job 8: Dependency check
   dependencies:
     name: Check Dependencies
@@ -340,21 +334,19 @@ jobs:
     - name: 🔧 Install PlatformIO
       run: pip install platformio
 
-    # <-- PERUBAHAN DI SINI: Update registry sebelum install
     - name: ✨ Update PIO Registry
       run: pio pkg update
 
-    # <-- PERUBAHAN DI SINI: Tambahkan flag verbose
+    # <-- PERUBAHAN DI SINI: Flag -v dihapus dari pio pkg install
     - name: 📦 Check library versions
       run: |
         echo "### Library Versions" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
-        pio pkg install -v # Install dulu
+        pio pkg install # Install dulu (tanpa -v)
         pio pkg list       # Baru list
         echo '```' >> $GITHUB_STEP_SUMMARY
 
-    # <-- PERUBAHAN DI SINI: Tambahkan flag verbose
     - name: 🔄 Check for updates
       run: |
         echo "Checking for library updates..."
-        pio pkg outdated -v || true # || true agar tidak gagal jika ada update
+        pio pkg outdated -v || true # Tetap pakai -v di sini
