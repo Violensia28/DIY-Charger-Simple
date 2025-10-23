@@ -25,7 +25,6 @@ BatteryLogger::BatteryLogger(PortData* data) {
 bool BatteryLogger::begin() {
     Wire.begin(I2C_SDA, I2C_SCL);
     Wire.setClock(I2C_FREQ);
-    
     DEBUG_PRINTLN("Initializing INA226 sensors...");
     
     bool allOk = true;
@@ -34,26 +33,31 @@ bool BatteryLogger::begin() {
             allOk = false;
         }
     }
-    
     return allOk;
 }
 
 bool BatteryLogger::initPort(int port) {
     if (port < 0 || port >= NUM_PORTS) return false;
     
-    if (!ina226[port].begin(INA226_ADDR[port], &Wire)) {
+    // Check if INA226 exists at address
+    Wire.beginTransmission(INA226_ADDR[port]);
+    if (Wire.endTransmission() != 0) {
         DEBUG_PRINTF("Port %d: INA226 not found at 0x%02X\n", port, INA226_ADDR[port]);
         portData[port].status = ERROR;
         snprintf(portData[port].errorMsg, 64, "Sensor not found");
         return false;
     }
     
-    // Configure INA226
-    ina226[port].setAveragingCount(INA226_COUNT_16);
-    ina226[port].setConversionTime(INA226_TIME_1100us);
+    // Initialize INA226_WE
+    ina226[port].init();
+    ina226[port].setI2CAddress(INA226_ADDR[port]);
     
-    // Calibrate for 0.1 ohm shunt, 3.2A max
-    ina226[port].calibrate(SHUNT_RESISTOR, MAX_CURRENT);
+    // Configure INA226_WE
+    ina226[port].setAverage(AVERAGE_16);
+    ina226[port].setConversionTime(CONV_TIME_1100);
+    
+    // Set resistor and current range (0.1 ohm, 3.2A max)
+    ina226[port].setResistorRange(SHUNT_RESISTOR, MAX_CURRENT);
     
     DEBUG_PRINTF("Port %d: INA226 initialized (0x%02X)\n", port, INA226_ADDR[port]);
     return true;
@@ -65,7 +69,6 @@ bool BatteryLogger::initPort(int port) {
 
 void BatteryLogger::update() {
     unsigned long currentTime = millis();
-    
     if (currentTime - lastSampleTime < SAMPLE_INTERVAL_MS) {
         return;
     }
@@ -85,8 +88,8 @@ void BatteryLogger::updatePort(int port) {
     if (port < 0 || port >= NUM_PORTS) return;
     if (!isPortReady(port)) return;
     
-    // Read raw values from INA226
-    float rawVoltage = ina226[port].getBusVoltage();
+    // Read raw values from INA226_WE
+    float rawVoltage = ina226[port].getBusVoltage_V();
     float rawCurrent = ina226[port].getCurrent_mA() / 1000.0; // Convert to A
     
     // Validate readings
@@ -119,14 +122,13 @@ void BatteryLogger::updatePort(int port) {
     // Update accumulators (mAh and Wh)
     unsigned long deltaTime = millis() - portData[port].lastUpdate;
     updateAccumulators(port, filteredVoltage, filteredCurrent, deltaTime);
-    
     portData[port].lastUpdate = millis();
     
     #if DEBUG_LOGGER
     if (millis() % 5000 < 100) { // Print every 5 seconds
-        DEBUG_PRINTF("Port %d: %.3fV %.3fA %.1fmAh %.2fWh\n", 
-                    port, filteredVoltage, filteredCurrent, 
-                    portData[port].mAh, portData[port].Wh);
+        DEBUG_PRINTF("Port %d: %.3fV %.3fA %.1fmAh %.2fWh\n",
+                     port, filteredVoltage, filteredCurrent,
+                     portData[port].mAh, portData[port].Wh);
     }
     #endif
 }
@@ -188,8 +190,7 @@ bool BatteryLogger::isPortReady(int port) {
 
 void BatteryLogger::calibratePort(int port) {
     if (port < 0 || port >= NUM_PORTS) return;
-    
-    ina226[port].calibrate(SHUNT_RESISTOR, MAX_CURRENT);
+    ina226[port].setResistorRange(SHUNT_RESISTOR, MAX_CURRENT);
     DEBUG_PRINTF("Port %d: Calibrated\n", port);
 }
 
@@ -206,7 +207,6 @@ String BatteryLogger::getCSVLine(int port) {
     
     char line[256];
     unsigned long timestamp = millis() - portData[port].startTime;
-    
     snprintf(line, 256, "%lu,%d,%.3f,%.3f,%.3f,%.1f,%.2f,%s,%s,%s\n",
              timestamp / 1000, // seconds
              port,
@@ -218,6 +218,5 @@ String BatteryLogger::getCSVLine(int port) {
              portData[port].getModeName(),
              portData[port].getBatteryName(),
              portData[port].getStatusName());
-    
     return String(line);
 }
