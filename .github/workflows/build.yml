@@ -17,9 +17,6 @@ permissions:
   contents: read
   security-events: write
 
-env:
-  PLATFORMIO_VERSION: latest
-
 jobs:
   build:
     name: Build Firmware
@@ -49,7 +46,7 @@ jobs:
       - name: 🔧 Install PlatformIO
         run: |
           python -m pip install --upgrade pip
-          pip install platformio==${{ env.PLATFORMIO_VERSION }}
+          pip install platformio
       
       - name: 📚 Install dependencies
         run: pio pkg install
@@ -88,3 +85,4 @@ jobs:
       - name: 🧹 Run static analysis
         run: pio check --environment esp32dev --skip-packages
         continue-on-error: true
+        
