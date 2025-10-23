@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_INA226.h>
+#include <INA226_WE.h>
 #include "Config.h"
 #include "BatteryTypes.h"
 
@@ -13,7 +13,7 @@
 
 class BatteryLogger {
 private:
-    Adafruit_INA226 ina226[NUM_PORTS];
+    INA226_WE ina226[NUM_PORTS];
     PortData* portData;
     
     // Filter buffers for median filtering
@@ -28,15 +28,13 @@ private:
     float medianFilter(float* buffer, int size);
     void updateAccumulators(int port, float voltage, float current, unsigned long deltaTime);
     bool validateReading(int port, float voltage, float current);
-    
+
 public:
     BatteryLogger(PortData* data);
-    
     bool begin();
     bool initPort(int port);
     void update();
     void updatePort(int port);
-    
     bool isPortReady(int port);
     void calibratePort(int port);
     
