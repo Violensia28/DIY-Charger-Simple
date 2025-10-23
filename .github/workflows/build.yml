@@ -55,6 +55,18 @@ jobs:
       run: pio pkg update
     - name: 📦 Install PIO Project Dependencies
       run: pio pkg install
+
+      name: 🌲 Show source tree
+      run: |
+        echo "Current Directory: $(pwd)"
+        echo "Listing root:"
+        ls -la
+        echo "Listing src/:"
+        ls -la src || echo "src/ not found"
+        echo "Listing include/:"
+        ls -la include || echo "include/ not found"
+        echo "Checking specific headers via git:"
+        git ls-files | grep -iE '(Logger|WebUI|UI)\.h' || echo "Headers not found by git ls-files"
     - name: 🔨 Build firmware
       run: |
         echo "Building DIY Charger Simple firmware..."
